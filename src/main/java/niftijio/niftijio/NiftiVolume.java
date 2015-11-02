@@ -1,4 +1,5 @@
-package niftijio;
+package niftijio.niftijio;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInput;
@@ -46,17 +47,28 @@ public class NiftiVolume
         this.data = new FourDimensionalArray(data);
     }
 
-    public static NiftiVolume read(String filename) throws IOException
-    {
+    public static NiftiVolume read(String filename) throws IOException {
         NiftiHeader hdr = NiftiHeader.read(filename);
 
         InputStream is = new FileInputStream(hdr.filename);
-
         if (hdr.filename.endsWith(".gz"))
             is = new GZIPInputStream(is);
+        return read(new BufferedInputStream(is), hdr);
+    }
 
-        is = new BufferedInputStream(is);
+    public static NiftiVolume read(InputStream is) throws IOException {
+        return read(is, null);
+    }
 
+    public static NiftiVolume read(InputStream is, String filename) throws IOException {
+        BufferedInputStream bis = new BufferedInputStream(is);
+        bis.mark(2048);
+        NiftiHeader hdr = NiftiHeader.read(is, filename);
+        bis.reset();
+        return read(bis, hdr);
+    }
+
+    private static NiftiVolume read(BufferedInputStream is, NiftiHeader hdr) throws IOException {
         // skip header
         is.skip((long) hdr.vox_offset);
 

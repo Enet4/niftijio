@@ -1,4 +1,4 @@
-package niftijio;
+package niftijio.niftijio;
 /*
  * [LEDataOutputStream.java]
  *

@@ -1,4 +1,4 @@
-package niftijio;
+package niftijio.niftijio;
 
 /* Four-dimensional array implementation that avoids using java's multi-dimensional arrays.
         * <p/>
@@ -17,6 +17,23 @@ public class FourDimensionalArray {
     private int nx, ny, nz, dim;
 
     public FourDimensionalArray(int nx, int ny, int nz, int dim) {
+        if (nx <= 0) {
+            throw new IllegalArgumentException("Illegal nx value: " + nx);
+        }
+        if (ny <= 0) {
+            throw new IllegalArgumentException("Illegal ny value: " + ny);
+        }
+        if (nz <= 0) {
+            throw new IllegalArgumentException("Illegal nz value: " + nz);
+        }
+        if (dim <= 0) {
+            throw new IllegalArgumentException("Illegal dim value: " + dim);
+        }
+        assert nx > 0;
+        assert ny > 0;
+        assert nz > 0;
+        assert dim > 0;
+        
         this.nx = nx;
         this.ny = ny;
         this.nz = nz;
