@@ -56,10 +56,23 @@ public class NiftiVolume
         return read(new BufferedInputStream(is), hdr);
     }
 
+    /** Read the NIFTI volume from a NIFTI input stream.
+     * 
+     * @param is an input stream pointing to the beginning of the NIFTI file, uncompressed.
+     * @return a NIFTI volume
+     * @throws IOException 
+     */
     public static NiftiVolume read(InputStream is) throws IOException {
         return read(is, null);
     }
 
+    /** Read the NIFTI volume from a NIFTI input stream.
+     * 
+     * @param is an input stream pointing to the beginning of the NIFTI file, uncompressed.
+     * @param filename the name of the original file, can be null
+     * @return a NIFTI volume
+     * @throws IOException 
+     */
     public static NiftiVolume read(InputStream is, String filename) throws IOException {
         BufferedInputStream bis = new BufferedInputStream(is);
         bis.mark(2048);
