@@ -12,11 +12,11 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.Date;
 import java.util.List;
+import java.util.TreeMap;
 
 public class NiftiHeader
 {
@@ -87,16 +87,41 @@ public class NiftiHeader
     public static final short NIFTI_UNITS_HZ = 32;
     public static final short NIFTI_UNITS_PPM = 40;
 
-    public static final short NIFTI_SLICE_SEQ_INC = 1;
-    public static final short NIFTI_SLICE_SEQ_DEC = 2;
-    public static final short NIFTI_SLICE_ALT_INC = 3;
-    public static final short NIFTI_SLICE_ALT_DEC = 4;
+    public static enum NiftiSliceOrder {
+        UNKNOWN(0), SEQ_INC(1), SEQ_DEC(2), ALT_INC(3), ALT_DEC(4);
+        public final byte code;
+        private NiftiSliceOrder(int code) {
+            this.code = (byte)code;
+        }
+        public static NiftiSliceOrder fromCode(byte code) {
+            switch (code) {
+                case 1: return SEQ_INC;
+                case 2: return SEQ_DEC;
+                case 3: return ALT_INC;
+                case 4: return ALT_DEC;
+                default: return UNKNOWN;
+            }
+        }
+    }
 
-    public static final short NIFTI_XFORM_UNKNOWN = 0;
-    public static final short NIFTI_XFORM_SCANNER_ANAT = 1;
-    public static final short NIFTI_XFORM_ALIGNED_ANAT = 2;
-    public static final short NIFTI_XFORM_TALAIRACH = 3;
-    public static final short NIFTI_XFORM_MNI_152 = 4;
+    public static enum NiftiXForm {
+        UNKNOWN(0), SCANNER_ANAT(1), ALIGNED_ANAT(2), TALAIRACH(3), MNI_152(4);
+
+        private static NiftiXForm fromCode(short code) {
+            switch (code) {
+                case 1: return SCANNER_ANAT;
+                case 2: return ALIGNED_ANAT;
+                case 3: return TALAIRACH;
+                case 4: return MNI_152;
+                default: return UNKNOWN;
+            }
+        }
+
+        public final short code;
+        private NiftiXForm(int code) {
+            this.code = (short)code;
+        }
+    }
 
     public static final int NIFTI_L2R = 1;
     public static final int NIFTI_R2L = 2;
@@ -134,7 +159,7 @@ public class NiftiHeader
     public float scl_slope;
     public float scl_inter;
     public short slice_end;
-    public byte slice_code;
+    public NiftiSliceOrder slice;
     public byte xyzt_units;
     public float cal_max;
     public float cal_min;
@@ -144,8 +169,8 @@ public class NiftiHeader
     public int glmin;
     public StringBuffer descrip;
     public StringBuffer aux_file;
-    public short qform_code;
-    public short sform_code;
+    public NiftiXForm qform;
+    public NiftiXForm sform;
     public float quatern[];
     public float qoffset[];
     public float srow_x[];
@@ -181,11 +206,10 @@ public class NiftiHeader
         this.dim[4] = (short) (dim > 1 ? dim : 0);
     }
 
-    public void setDatatype(short code)
+    private void setDatatype(short code)
     {
         datatype = code;
         bitpix = (short) (bytesPerVoxel(code) * 8);
-        return;
     }
 
     public String decodeIntent(short icode)
@@ -351,40 +375,20 @@ public class NiftiHeader
         }
     }
 
-    public String decodeSliceOrder(short code)
+    public String decodeSliceOrder(NiftiSliceOrder slice)
     {
-        switch (code)
-        {
-        case NiftiHeader.NIFTI_SLICE_SEQ_INC:
-            return ("NIFTI_SLICE_SEQ_INC");
-        case NiftiHeader.NIFTI_SLICE_SEQ_DEC:
-            return ("NIFTI_SLICE_SEQ_DEC");
-        case NiftiHeader.NIFTI_SLICE_ALT_INC:
-            return ("NIFTI_SLICE_ALT_INC");
-        case NiftiHeader.NIFTI_SLICE_ALT_DEC:
-            return ("NIFTI_SLICE_ALT_DEC");
-        default:
-            return ("INVALID_NIFTI_SLICE_SEQ_CODE");
+        if (slice != null && slice.code != 0) {
+            return "NIFTI_SLICE_" + slice.toString();
         }
+        return ("INVALID_NIFTI_SLICE_SEQ_CODE");
     }
 
-    public String decodeXform(short code)
+    public String decodeXform(NiftiXForm xform)
     {
-        switch (code)
-        {
-        case NiftiHeader.NIFTI_XFORM_UNKNOWN:
-            return ("NIFTI_XFORM_UNKNOWN");
-        case NiftiHeader.NIFTI_XFORM_SCANNER_ANAT:
-            return ("NIFTI_XFORM_SCANNER_ANAT");
-        case NiftiHeader.NIFTI_XFORM_ALIGNED_ANAT:
-            return ("NIFTI_XFORM_ALIGNED_ANAT");
-        case NiftiHeader.NIFTI_XFORM_TALAIRACH:
-            return ("NIFTI_XFORM_TALAIRACH");
-        case NiftiHeader.NIFTI_XFORM_MNI_152:
-            return ("NIFTI_XFORM_MNI_152");
-        default:
-            return ("INVALID_NIFTI_XFORM_CODE");
+        if (xform != null) {
+            return "NIFTI_XFORM_" + xform.toString();
         }
+        return ("INVALID_NIFTI_XFORM_CODE");
     }
 
     public String decodeUnits(short code)
@@ -434,10 +438,6 @@ public class NiftiHeader
         dim = new short[8];
         for (int i = 0; i < 8; i++)
             dim[i] = 0;
-        //dim[1] = 0;
-        //dim[2] = 0;
-        //dim[3] = 0;
-        //dim[4] = 0;
         intent = new float[3];
         for (int i = 0; i < 3; i++)
             intent[i] = (float) 0.0;
@@ -456,7 +456,7 @@ public class NiftiHeader
         scl_slope = (float) 0.0;
         scl_inter = (float) 0.0;
         slice_end = 0;
-        slice_code = (byte) 0;
+        slice = NiftiSliceOrder.UNKNOWN;
         xyzt_units = (byte) 0;
         xyz_unit_code = NiftiHeader.NIFTI_UNITS_UNKNOWN;
         t_unit_code = NiftiHeader.NIFTI_UNITS_UNKNOWN;
@@ -476,8 +476,8 @@ public class NiftiHeader
         for (int i = 0; i < 24; i++)
             aux_file.append("\0");
 
-        qform_code = NiftiHeader.NIFTI_XFORM_UNKNOWN;
-        sform_code = NiftiHeader.NIFTI_XFORM_UNKNOWN;
+        qform = NiftiXForm.UNKNOWN;
+        sform = NiftiXForm.UNKNOWN;
 
         quatern = new float[3];
         qoffset = new float[3];
@@ -513,7 +513,7 @@ public class NiftiHeader
 
     public Map<String,String> info()
     {
-        Map<String,String> info = new HashMap<>();
+        Map<String,String> info = new TreeMap<>();
 
         info.put("size", String.valueOf(sizeof_hdr));
         info.put("data_offset", String.valueOf(vox_offset));
@@ -528,7 +528,7 @@ public class NiftiHeader
             info.put("dim" + i, String.valueOf(dim[i]));
 
         for (int i = 0; i <= dim[0]; i++)
-            info.put("space" + i, String.valueOf(pixdim[i]));
+            info.put("pixdim" + i, String.valueOf(pixdim[i]));
 
         info.put("xyz_units_code", String.valueOf(xyz_unit_code));
         info.put("xyz_units_name", decodeUnits(xyz_unit_code));
@@ -544,8 +544,8 @@ public class NiftiHeader
         info.put("cal_max", String.valueOf(cal_max));
         info.put("cal_min", String.valueOf(cal_min));
 
-        info.put("slice_code", String.valueOf(slice_code));
-        info.put("slice_name", decodeSliceOrder((short) slice_code));
+        info.put("slice_code", String.valueOf(slice.code));
+        info.put("slice_name", decodeSliceOrder(slice));
         info.put("slice_freq", String.valueOf(freq_dim));
         info.put("slice_phase", String.valueOf(phase_dim));
         info.put("slice_index", String.valueOf(slice_dim));
@@ -553,8 +553,8 @@ public class NiftiHeader
         info.put("slice_end", String.valueOf(slice_end));
         info.put("slice_dur", String.valueOf(slice_duration));
         info.put("qfac", String.valueOf(qfac));
-        info.put("qform_code", String.valueOf(qform_code));
-        info.put("qform_name", decodeXform(qform_code));
+        info.put("qform_code", String.valueOf(qform.code));
+        info.put("qform_name", decodeXform(qform));
         info.put("quat_b", String.valueOf(quatern[0]));
         info.put("quat_c", String.valueOf(quatern[1]));
         info.put("quat_d", String.valueOf(quatern[2]));
@@ -562,8 +562,8 @@ public class NiftiHeader
         info.put("quat_y", String.valueOf(qoffset[1]));
         info.put("quat_z", String.valueOf(qoffset[2]));
 
-        info.put("sform_code", String.valueOf(sform_code));
-        info.put("sform_name", decodeXform(sform_code));
+        info.put("sform_code", String.valueOf(sform.code));
+        info.put("sform_name", decodeXform(sform));
         for (int i = 0; i < 4; i++)
             info.put("sform0" + i, String.valueOf(srow_x[i]));
         for (int i = 0; i < 4; i++)
@@ -696,14 +696,6 @@ public class NiftiHeader
 
         for (int i = 0; i < 8; i++)
             ds.dim[i] = di.readShort();
-        if (ds.dim[0] > 0)
-            ds.dim[1] = ds.dim[1];
-        if (ds.dim[0] > 1)
-            ds.dim[2] = ds.dim[2];
-        if (ds.dim[0] > 2)
-            ds.dim[3] = ds.dim[3];
-        if (ds.dim[0] > 3)
-            ds.dim[4] = ds.dim[4];
 
         for (int i = 0; i < 3; i++)
             ds.intent[i] = di.readFloat();
@@ -721,7 +713,7 @@ public class NiftiHeader
         ds.scl_slope = di.readFloat();
         ds.scl_inter = di.readFloat();
         ds.slice_end = di.readShort();
-        ds.slice_code = (byte) di.readUnsignedByte();
+        ds.slice = NiftiSliceOrder.fromCode((byte) di.readUnsignedByte());
 
         ds.xyzt_units = (byte) di.readUnsignedByte();
 
@@ -744,8 +736,8 @@ public class NiftiHeader
         di.readFully(bb, 0, 24);
         ds.aux_file = new StringBuffer(new String(bb));
 
-        ds.qform_code = di.readShort();
-        ds.sform_code = di.readShort();
+        ds.qform = NiftiXForm.fromCode(di.readShort());
+        ds.sform = NiftiXForm.fromCode(di.readShort());
 
         for (int i = 0; i < 3; i++)
             ds.quatern[i] = di.readFloat();
@@ -853,7 +845,7 @@ public class NiftiHeader
         dout.writeFloat(this.scl_slope);
         dout.writeFloat(this.scl_inter);
         dout.writeShort(this.slice_end);
-        dout.writeByte((int) this.slice_code);
+        dout.writeByte(this.slice.code);
 
         int units = ((byte) (((int) (this.xyz_unit_code) & 007) | ((int) (this.t_unit_code) & 070)));
         dout.writeByte(units);
@@ -865,8 +857,8 @@ public class NiftiHeader
         dout.writeInt(this.glmin);
         dout.write(NiftiHeader.setStringSize(this.descrip, 80), 0, 80);
         dout.write(NiftiHeader.setStringSize(this.aux_file, 24), 0, 24);
-        dout.writeShort(this.qform_code);
-        dout.writeShort(this.sform_code);
+        dout.writeShort(this.qform.code);
+        dout.writeShort(this.sform.code);
 
         for (int i = 0; i < 3; i++)
             dout.writeFloat(this.quatern[i]);
@@ -1196,11 +1188,11 @@ public class NiftiHeader
 
     public double[][] mat44()
     {
-        if (this.sform_code > 0)
+        if (this.sform.code > 0)
         {
             return sform_to_mat44();
         }
-        else if (this.qform_code > 0)
+        else if (this.qform.code > 0)
         {
             return qform_to_mat44();
         }
@@ -1243,8 +1235,6 @@ public class NiftiHeader
         double dx = this.pixdim[1];
         double dy = this.pixdim[2];
         double dz = this.pixdim[3];
-
-        double qfac = this.qfac;
 
         double[][] R = new double[4][4];
         
@@ -1310,7 +1300,7 @@ public class NiftiHeader
             this.srow_z[i] = (float) mat44[2][i];
         }
         
-        this.sform_code = 1;
+        this.sform = NiftiXForm.SCANNER_ANAT;
     }
 
     private static double[][] mult(double[][] A, double[][] B)

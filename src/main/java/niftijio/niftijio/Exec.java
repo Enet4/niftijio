@@ -3,7 +3,7 @@ package niftijio.niftijio;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-public class Example
+public class Exec
 {
     private static void printUsage() {
         System.out.println("Usage: niftijio input.nii.gz [output_filename]");
@@ -19,23 +19,30 @@ public class Example
                 return;
             }
             
-            NiftiVolume volume = NiftiVolume.read(args[0]);
+            NiftiVolume volume = null;
+            NiftiHeader header;
+            if (args.length > 1) {
+                volume = NiftiVolume.read(args[0]);
+                header = volume.header;
+            } else  {
+                header = NiftiHeader.read(args[0]);
+            }
 
-            int nx = volume.header.dim[1];
-            int ny = volume.header.dim[2];
-            int nz = volume.header.dim[3];
-            int dim = volume.header.dim[4];
+            int nx = header.dim[1];
+            int ny = header.dim[2];
+            int nz = header.dim[3];
+            int dim = header.dim[4];
 
             if (dim == 0)
                 dim = 1;
 
-            try (PrintWriter out = (args.length > 1) ? new PrintWriter(args[1]) : new PrintWriter(System.out)) {
+            try (PrintWriter out = (volume != null) ? new PrintWriter(args[1]) : new PrintWriter(System.out)) {
                 out.println("volume ");
-                out.println("dimensions:");
+                out.print("dimensions: ");
                 out.println(nx + " " + ny + " " + nz + " " + dim);
-                volume.header.dump(out);
+                header.dump(out);
                 out.println();
-                if (args.length > 1) {
+                if (volume != null) {
                     out.println("data:");
                     for (int d = 0; d < dim; d++) {
                         out.printf("----BEGIN dim=%-2d----", d);
